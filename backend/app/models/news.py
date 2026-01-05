@@ -70,6 +70,7 @@ class News(Base):
     is_published = Column(Boolean, default=False)
     is_featured = Column(Boolean, default=False)  # Show on main page
     publish_date = Column(DateTime(timezone=True), nullable=True)
+    scheduled_publish_at = Column(DateTime(timezone=True), nullable=True)  # For scheduled publishing
     
     # Metadata
     author_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -84,6 +85,7 @@ class News(Base):
     
     def __repr__(self):
         return f"<News {self.title}>"
+
 
 
 

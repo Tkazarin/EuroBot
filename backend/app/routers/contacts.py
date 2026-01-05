@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.contact import ContactMessageCreate, ContactMessageUpdate, ContactMessageResponse, ContactMessageListResponse
 from app.dependencies import get_current_admin, get_client_ip
 from app.utils.email import send_contact_notification
+from app.utils.captcha import verify_captcha
 
 router = APIRouter(prefix="/contacts", tags=["Contacts"])
 
@@ -22,7 +23,15 @@ async def send_contact_message(
     db: AsyncSession = Depends(get_db)
 ):
     """Submit contact form message."""
-    # TODO: Add reCAPTCHA verification
+    # Verify captcha if token provided
+    if message_data.recaptcha_token:
+        client_ip = request.client.host if request.client else None
+        is_valid = await verify_captcha(message_data.recaptcha_token, ip=client_ip)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Проверка капчи не пройдена. Попробуйте снова."
+            )
     
     message = ContactMessage(
         name=message_data.name,

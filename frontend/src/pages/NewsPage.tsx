@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { newsApi } from '../api/news'
@@ -10,6 +9,7 @@ import { ru } from 'date-fns/locale'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import SEO from '../components/SEO'
 
 export default function NewsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -74,10 +74,11 @@ export default function NewsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Новости — Евробот Россия</title>
-        <meta name="description" content="Новости соревнований Евробот: объявления, результаты, инструкции и события." />
-      </Helmet>
+      <SEO
+        title="Новости"
+        description="Новости соревнований Евробот: объявления, результаты, инструкции и события."
+        url="/news"
+      />
 
       <div className="bg-eurobot-navy py-16">
         <div className="container-custom">
@@ -246,6 +247,7 @@ export default function NewsPage() {
     </>
   )
 }
+
 
 
 

@@ -26,9 +26,19 @@ export interface NewsCreateData {
   tag_ids?: number[]
 }
 
+export interface AdminNewsFilters extends NewsFilters {
+  is_published?: boolean
+}
+
 export const newsApi = {
   getList: async (filters: NewsFilters = {}): Promise<NewsListResponse> => {
     const response = await apiClient.get('/news', { params: filters })
+    return response.data
+  },
+
+  // Get all news including unpublished (admin only)
+  getListAdmin: async (filters: AdminNewsFilters = {}): Promise<NewsListResponse> => {
+    const response = await apiClient.get('/news/admin/all', { params: filters })
     return response.data
   },
 

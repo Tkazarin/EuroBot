@@ -26,6 +26,8 @@ const AdminSeasons = lazy(() => import('./pages/admin/SeasonsManagement'))
 const AdminMessages = lazy(() => import('./pages/admin/MessagesManagement'))
 const AdminSettings = lazy(() => import('./pages/admin/SettingsManagement'))
 const AdminAdmins = lazy(() => import('./pages/admin/AdminsManagement'))
+const AdminDatabase = lazy(() => import('./pages/admin/DatabaseManagement'))
+const AdminMailings = lazy(() => import('./pages/admin/MailingsPage'))
 
 function App() {
   return (
@@ -59,6 +61,8 @@ function App() {
           <Route path="messages" element={<AdminMessages />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="admins" element={<AdminAdmins />} />
+          <Route path="database" element={<AdminDatabase />} />
+          <Route path="mailings" element={<AdminMailings />} />
         </Route>
       </Routes>
     </Suspense>

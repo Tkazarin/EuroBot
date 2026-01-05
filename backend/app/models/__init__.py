@@ -8,6 +8,7 @@ from app.models.archive import ArchiveSeason, ArchiveMedia
 from app.models.contact import ContactMessage
 from app.models.settings import SiteSettings
 from app.models.admin_log import AdminLog
+from app.models.email_log import EmailLog, MassMailingCampaign
 
 __all__ = [
     "User",
@@ -18,8 +19,10 @@ __all__ = [
     "ArchiveSeason", "ArchiveMedia",
     "ContactMessage",
     "SiteSettings",
-    "AdminLog"
+    "AdminLog",
+    "EmailLog", "MassMailingCampaign"
 ]
+
 
 
 

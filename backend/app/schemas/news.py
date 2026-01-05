@@ -46,6 +46,7 @@ class NewsBase(BaseModel):
     is_published: bool = False
     is_featured: bool = False
     publish_date: Optional[datetime] = None
+    scheduled_publish_at: Optional[datetime] = None  # Schedule for future publishing
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
 
@@ -67,6 +68,7 @@ class NewsUpdate(BaseModel):
     is_published: Optional[bool] = None
     is_featured: Optional[bool] = None
     publish_date: Optional[datetime] = None
+    scheduled_publish_at: Optional[datetime] = None  # Schedule for future publishing
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
     tag_ids: Optional[List[int]] = None
@@ -82,6 +84,7 @@ class NewsResponse(NewsBase):
     author_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    scheduled_publish_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -93,6 +96,7 @@ class NewsListResponse(BaseModel):
     total: int
     page: int
     pages: int
+
 
 
 

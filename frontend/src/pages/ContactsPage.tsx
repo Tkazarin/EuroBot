@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { useForm } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -11,6 +10,10 @@ import {
 } from '@heroicons/react/24/outline'
 import { contactsApi, ContactCreateData } from '../api/contacts'
 import { useSettingsStore } from '../store/settingsStore'
+import { useSmartCaptcha } from '../hooks/useSmartCaptcha'
+import SEO from '../components/SEO'
+import SmartCaptcha from '../components/ui/SmartCaptcha'
+import YandexMap from '../components/YandexMap'
 import Input from '../components/ui/Input'
 import PhoneInput from '../components/ui/PhoneInput'
 import Textarea from '../components/ui/Textarea'
@@ -29,20 +32,34 @@ export default function ContactsPage() {
   const { settings } = useSettingsStore()
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const { isEnabled: captchaEnabled, resetCaptcha } = useSmartCaptcha()
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactCreateData>()
 
   const contactEmails = settings.contact_emails as Record<string, string> | undefined
 
   const onSubmit = async (data: ContactCreateData) => {
+    // Check captcha if enabled
+    if (captchaEnabled && !captchaToken) {
+      toast.error('Пожалуйста, пройдите проверку капчи')
+      return
+    }
+
     setSubmitting(true)
     try {
-      await contactsApi.send(data)
+      await contactsApi.send({
+        ...data,
+        recaptcha_token: captchaToken || undefined
+      })
       setSuccess(true)
       reset()
+      setCaptchaToken(null)
+      resetCaptcha()
       toast.success('Сообщение отправлено!')
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Ошибка при отправке')
+      resetCaptcha()
     } finally {
       setSubmitting(false)
     }
@@ -50,10 +67,11 @@ export default function ContactsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Контакты — Евробот Россия</title>
-        <meta name="description" content="Свяжитесь с организаторами соревнований Евробот. Контактные данные и форма обратной связи." />
-      </Helmet>
+      <SEO
+        title="Контакты"
+        description="Свяжитесь с организаторами соревнований Евробот. Контактные данные и форма обратной связи."
+        url="/contacts"
+      />
 
       <div className="bg-eurobot-navy py-16">
         <div className="container-custom">
@@ -137,8 +155,8 @@ export default function ContactsPage() {
                   <div>
                     <h3 className="font-semibold mb-1">Адрес</h3>
                     <p className="text-gray-600">
-                      Москва, Россия<br />
-                      ул. Примерная, д. 1
+                      ул. Косыгина, 17, корп. 1<br />
+                      Москва, Россия
                     </p>
                   </div>
                 </div>
@@ -223,6 +241,12 @@ export default function ContactsPage() {
                       placeholder="Опишите ваш вопрос..."
                     />
 
+                    {/* Yandex SmartCaptcha */}
+                    <SmartCaptcha
+                      onVerify={(token) => setCaptchaToken(token)}
+                      className="mt-2"
+                    />
+
                     <Button
                       type="submit"
                       className="w-full"
@@ -238,12 +262,20 @@ export default function ContactsPage() {
         </div>
       </section>
 
-      {/* Map placeholder */}
-      <section className="h-96 bg-gray-200">
-        <div className="w-full h-full flex items-center justify-center text-gray-500">
-          <MapPinIcon className="w-12 h-12 mr-4" />
-          <span className="text-xl">Карта (Яндекс.Карты / Google Maps)</span>
-        </div>
+      {/* Map */}
+      <section>
+        <YandexMap
+          center={[55.7025, 37.5547]}
+          zoom={16}
+          markers={[
+            {
+              coordinates: [55.7025, 37.5547],
+              title: 'EUROBOT Россия',
+              description: 'ул. Косыгина, 17, корп. 1, Москва'
+            }
+          ]}
+          height="400px"
+        />
       </section>
     </>
   )

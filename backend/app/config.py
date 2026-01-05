@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     FROM_EMAIL: str = "noreply@eurobot.ru"
     
-    # reCAPTCHA
-    RECAPTCHA_SECRET_KEY: Optional[str] = None
-    RECAPTCHA_SITE_KEY: Optional[str] = None
+    # Yandex SmartCaptcha
+    SMARTCAPTCHA_SERVER_KEY: Optional[str] = None
+    SMARTCAPTCHA_CLIENT_KEY: Optional[str] = None
     
     # File upload
     UPLOAD_DIR: str = "uploads"

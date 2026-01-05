@@ -178,6 +178,16 @@ async def create_news(
         result = await db.execute(select(NewsTag).where(NewsTag.id.in_(news_data.tag_ids)))
         tags = result.scalars().all()
     
+    # Handle scheduled publishing
+    is_published = news_data.is_published
+    publish_date = news_data.publish_date
+    scheduled_publish_at = news_data.scheduled_publish_at
+    
+    # If scheduled for future, don't publish yet
+    if scheduled_publish_at and scheduled_publish_at > datetime.utcnow():
+        is_published = False
+        publish_date = None  # Will be set when auto-published
+    
     # Create news
     news = News(
         title=news_data.title,
@@ -188,9 +198,10 @@ async def create_news(
         video_url=news_data.video_url,
         gallery=news_data.gallery,
         category_id=news_data.category_id,
-        is_published=news_data.is_published,
+        is_published=is_published,
         is_featured=news_data.is_featured,
-        publish_date=news_data.publish_date or datetime.utcnow(),
+        publish_date=publish_date or (datetime.utcnow() if is_published else None),
+        scheduled_publish_at=scheduled_publish_at,
         meta_title=news_data.meta_title,
         meta_description=news_data.meta_description,
         author_id=admin.id,
@@ -285,4 +296,95 @@ async def delete_news(
     await db.commit()
     
     return {"message": "Новость удалена"}
+
+
+@router.post("/publish-scheduled")
+async def publish_scheduled_news(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Publish all scheduled news that are due (admin only).
+    This can be called manually or by a cron job.
+    """
+    now = datetime.utcnow()
+    
+    # Find all news scheduled for publishing before now
+    query = select(News).where(
+        News.is_published == False,
+        News.scheduled_publish_at != None,
+        News.scheduled_publish_at <= now
+    )
+    
+    result = await db.execute(query)
+    scheduled_news = result.scalars().all()
+    
+    published_count = 0
+    for news in scheduled_news:
+        news.is_published = True
+        news.publish_date = now
+        published_count += 1
+    
+    await db.commit()
+    
+    return {
+        "message": f"Опубликовано {published_count} запланированных новостей",
+        "published_count": published_count
+    }
+
+
+@router.get("/admin/scheduled", response_model=List[NewsResponse])
+async def get_scheduled_news(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all scheduled (unpublished) news (admin only)."""
+    query = select(News).options(
+        selectinload(News.category),
+        selectinload(News.tags)
+    ).where(
+        News.is_published == False,
+        News.scheduled_publish_at != None
+    ).order_by(News.scheduled_publish_at.asc())
+    
+    result = await db.execute(query)
+    return result.scalars().unique().all()
+
+
+@router.get("/admin/all", response_model=NewsListResponse)
+async def list_all_news_admin(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    is_published: Optional[bool] = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all news including unpublished (admin only)."""
+    query = select(News).options(
+        selectinload(News.category),
+        selectinload(News.tags)
+    )
+    
+    if is_published is not None:
+        query = query.where(News.is_published == is_published)
+    
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.execute(count_query)
+    total_count = total.scalar() or 0
+    
+    # Pagination
+    offset = (page - 1) * limit
+    query = query.order_by(News.created_at.desc())
+    query = query.offset(offset).limit(limit)
+    
+    result = await db.execute(query)
+    news_list = result.scalars().unique().all()
+    
+    return NewsListResponse(
+        items=news_list,
+        total=total_count,
+        page=page,
+        pages=(total_count + limit - 1) // limit
+    )
 

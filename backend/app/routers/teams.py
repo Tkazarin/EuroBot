@@ -14,6 +14,7 @@ from app.models.competition import Season
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamListResponse
 from app.dependencies import get_current_admin, get_current_user, get_client_ip
 from app.utils.email import send_registration_confirmation
+from app.utils.captcha import verify_captcha
 
 router = APIRouter(prefix="/teams", tags=["Teams"])
 
@@ -28,6 +29,16 @@ async def register_team(
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new team for competition."""
+    # Verify captcha if token provided
+    if team_data.recaptcha_token:
+        client_ip = request.client.host if request.client else None
+        is_valid = await verify_captcha(team_data.recaptcha_token, ip=client_ip)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Проверка капчи не пройдена. Попробуйте снова."
+            )
+    
     # Check if season exists and registration is open
     result = await db.execute(select(Season).where(Season.id == team_data.season_id))
     season = result.scalar_one_or_none()

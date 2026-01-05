@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { 
   ArrowRightIcon, 
@@ -14,6 +13,7 @@ import { seasonsApi } from '../api/seasons'
 import { News, Season } from '../types'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import SEO from '../components/SEO'
 
 export default function HomePage() {
   const [featuredNews, setFeaturedNews] = useState<News[]>([])
@@ -41,10 +41,11 @@ export default function HomePage() {
 
   return (
     <>
-      <Helmet>
-        <title>Евробот Россия — Международные соревнования по робототехнике</title>
-        <meta name="description" content="Официальный сайт соревнований Евробот в России. Регистрация команд, новости, правила и архив сезонов." />
-      </Helmet>
+      <SEO
+        title="Евробот Россия"
+        description="Официальный сайт соревнований Евробот в России. Регистрация команд, новости, правила и архив сезонов."
+        url="/"
+      />
 
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-eurobot-navy via-eurobot-blue to-eurobot-navy overflow-hidden">
@@ -304,6 +305,7 @@ export default function HomePage() {
     </>
   )
 }
+
 
 
 

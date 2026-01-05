@@ -13,7 +13,9 @@ import {
   Bars3Icon,
   XMarkIcon,
   ChevronLeftIcon,
-  UsersIcon
+  UsersIcon,
+  CircleStackIcon,
+  PaperAirplaneIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '../../store/authStore'
 
@@ -31,8 +33,10 @@ const navigation: NavItem[] = [
   { name: 'Партнеры', href: '/admin/partners', icon: BuildingOfficeIcon },
   { name: 'Сезоны', href: '/admin/seasons', icon: CalendarIcon },
   { name: 'Сообщения', href: '/admin/messages', icon: EnvelopeIcon },
+  { name: 'Рассылки', href: '/admin/mailings', icon: PaperAirplaneIcon },
   { name: 'Настройки', href: '/admin/settings', icon: Cog6ToothIcon },
   { name: 'Администраторы', href: '/admin/admins', icon: UsersIcon, superAdminOnly: true },
+  { name: 'База данных', href: '/admin/database', icon: CircleStackIcon, superAdminOnly: true },
 ]
 
 export default function AdminLayout() {

@@ -20,7 +20,9 @@ from app.routers import (
     contacts_router,
     settings_router,
     upload_router,
-    admin_router
+    admin_router,
+    email_router,
+    database_router
 )
 
 
@@ -44,7 +46,8 @@ app = FastAPI(
     title="Eurobot Russia API",
     description="API для сайта соревнований Евробот Россия",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False  # Disable automatic redirects for trailing slashes
 )
 
 # CORS middleware
@@ -73,6 +76,8 @@ app.include_router(contacts_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(email_router, prefix="/api")
+app.include_router(database_router, prefix="/api")
 
 
 @app.get("/")

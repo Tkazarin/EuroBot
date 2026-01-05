@@ -3,7 +3,7 @@ import { SiteSettings, DashboardStats } from '../types'
 
 export const settingsApi = {
   getPublic: async (): Promise<SiteSettings> => {
-    const response = await apiClient.get('/settings')
+    const response = await apiClient.get('/settings/')
     return response.data
   },
 
@@ -13,7 +13,7 @@ export const settingsApi = {
   },
 
   getAll: async (): Promise<SiteSettings[]> => {
-    const response = await apiClient.get('/settings/all/admin')
+    const response = await apiClient.get('/settings/all/admin/')
     return response.data
   },
 
@@ -47,6 +47,7 @@ export const adminApi = {
     return response.data
   }
 }
+
 
 
 

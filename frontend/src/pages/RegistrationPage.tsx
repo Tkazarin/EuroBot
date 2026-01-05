@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -8,6 +7,9 @@ import { CheckCircleIcon, UserPlusIcon, TrashIcon } from '@heroicons/react/24/ou
 import { teamsApi, TeamRegisterData, TeamMemberData } from '../api/teams'
 import { seasonsApi } from '../api/seasons'
 import { Season } from '../types'
+import { useSmartCaptcha } from '../hooks/useSmartCaptcha'
+import SmartCaptcha from '../components/ui/SmartCaptcha'
+import SEO from '../components/SEO'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import Input from '../components/ui/Input'
 import PhoneInput from '../components/ui/PhoneInput'
@@ -31,6 +33,8 @@ export default function RegistrationPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const { isEnabled: captchaEnabled, resetCaptcha } = useSmartCaptcha()
 
   const { register, handleSubmit, control, formState: { errors } } = useForm<RegistrationFormData>({
     defaultValues: {
@@ -77,6 +81,12 @@ export default function RegistrationPage() {
       }))
     ]
 
+    // Check captcha if enabled
+    if (captchaEnabled && !captchaToken) {
+      toast.error('Пожалуйста, пройдите проверку капчи')
+      return
+    }
+
     setSubmitting(true)
     try {
       await teamsApi.register({
@@ -91,12 +101,15 @@ export default function RegistrationPage() {
         poster_link: data.poster_link,
         rules_accepted: data.rules_accepted,
         season_id: currentSeason.id,
-        members: allMembers
+        members: allMembers,
+        recaptcha_token: captchaToken || undefined
       })
       setSuccess(true)
       toast.success('Команда успешно зарегистрирована!')
+      resetCaptcha()
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Ошибка при регистрации')
+      resetCaptcha()
     } finally {
       setSubmitting(false)
     }
@@ -115,9 +128,11 @@ export default function RegistrationPage() {
   if (!currentSeason || !currentSeason.registration_open) {
     return (
       <>
-        <Helmet>
-          <title>Регистрация — Евробот Россия</title>
-        </Helmet>
+        <SEO
+          title="Регистрация"
+          description="Регистрация команды на соревнования Евробот закрыта."
+          url="/registration"
+        />
 
         <div className="bg-eurobot-navy py-16">
           <div className="container-custom">
@@ -142,9 +157,11 @@ export default function RegistrationPage() {
   if (success) {
     return (
       <>
-        <Helmet>
-          <title>Регистрация успешна — Евробот Россия</title>
-        </Helmet>
+        <SEO
+          title="Регистрация успешна"
+          description="Ваша команда успешно зарегистрирована на соревнования Евробот."
+          url="/registration"
+        />
 
         <div className="container-custom py-20">
           <motion.div
@@ -171,10 +188,11 @@ export default function RegistrationPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Регистрация команды — Евробот Россия</title>
-        <meta name="description" content="Зарегистрируйте свою команду для участия в соревнованиях Евробот." />
-      </Helmet>
+      <SEO
+        title="Регистрация команды"
+        description={`Зарегистрируйте свою команду для участия в ${currentSeason.name}. Онлайн-регистрация на соревнования Евробот.`}
+        url="/registration"
+      />
 
       <div className="bg-eurobot-navy py-16">
         <div className="container-custom">
@@ -370,6 +388,12 @@ export default function RegistrationPage() {
                 {errors.rules_accepted && (
                   <p className="text-sm text-red-500 -mt-4">{errors.rules_accepted.message}</p>
                 )}
+
+                {/* Yandex SmartCaptcha */}
+                <SmartCaptcha
+                  onVerify={(token) => setCaptchaToken(token)}
+                  className="mt-4"
+                />
 
                 <Button
                   type="submit"

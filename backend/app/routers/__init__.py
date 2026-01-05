@@ -10,6 +10,8 @@ from app.routers.contacts import router as contacts_router
 from app.routers.settings import router as settings_router
 from app.routers.upload import router as upload_router
 from app.routers.admin import router as admin_router
+from app.routers.email import router as email_router
+from app.routers.database import router as database_router
 
 __all__ = [
     "auth_router",
@@ -22,8 +24,11 @@ __all__ = [
     "contacts_router",
     "settings_router",
     "upload_router",
-    "admin_router"
+    "admin_router",
+    "email_router",
+    "database_router"
 ]
+
 
 
 

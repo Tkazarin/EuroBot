@@ -24,7 +24,7 @@ export default function NewsManagement() {
   const fetchNews = async () => {
     try {
       const [newsData, categoriesData] = await Promise.all([
-        newsApi.getList({ limit: 50 }),
+        newsApi.getListAdmin({ limit: 50 }),  // Use admin endpoint to get ALL news
         newsApi.getCategories()
       ])
       setNews(newsData.items)
@@ -307,6 +307,7 @@ export default function NewsManagement() {
     </div>
   )
 }
+
 
 
 

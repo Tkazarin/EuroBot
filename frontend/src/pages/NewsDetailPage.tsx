@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { ArrowLeftIcon, CalendarIcon, EyeIcon, TagIcon } from '@heroicons/react/24/outline'
 import { newsApi } from '../api/news'
@@ -9,6 +8,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ReactPlayer from 'react-player'
+import SEO from '../components/SEO'
 
 export default function NewsDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -51,13 +51,15 @@ export default function NewsDetailPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{news.meta_title || news.title} — Евробот Россия</title>
-        <meta name="description" content={news.meta_description || news.excerpt || ''} />
-        <meta property="og:title" content={news.title} />
-        <meta property="og:description" content={news.excerpt || ''} />
-        {news.featured_image && <meta property="og:image" content={news.featured_image} />}
-      </Helmet>
+      <SEO
+        title={news.meta_title || news.title}
+        description={news.meta_description || news.excerpt || 'Новость соревнований Евробот'}
+        image={news.featured_image || undefined}
+        url={`/news/${news.slug}`}
+        type="article"
+        publishedTime={news.publish_date || undefined}
+        keywords={news.tags?.map(t => t.name) || []}
+      />
 
       <article>
         {/* Header with image */}
@@ -173,6 +175,7 @@ export default function NewsDetailPage() {
     </>
   )
 }
+
 
 
 
