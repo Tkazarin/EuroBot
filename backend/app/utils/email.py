@@ -2,12 +2,71 @@
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from jinja2 import Template
+from email.utils import formatdate, make_msgid
 from typing import Optional, List
 from datetime import datetime
+import html as html_module
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
+
+
+def create_html_template(body: str, subject: str) -> str:
+    """Create a proper HTML email template from plain text."""
+    # Escape HTML and convert newlines to <br>
+    escaped_body = html_module.escape(body).replace('\n', '<br>')
+    
+    return f"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{html_module.escape(subject)}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f5f5f5;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 30px; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                Евробот Россия
+                            </h1>
+                        </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 20px;">
+                                {html_module.escape(subject)}
+                            </h2>
+                            <div style="color: #374151; font-size: 16px; line-height: 1.6;">
+                                {escaped_body}
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 20px 30px; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                            <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                                С уважением,<br>
+                                <strong>Команда Евробот Россия</strong>
+                            </p>
+                            <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 12px;">
+                                Это письмо отправлено автоматически. Если вы получили его по ошибке, просто проигнорируйте.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
 
 
 async def send_email(
@@ -56,18 +115,22 @@ async def send_email(
             continue
         
         try:
-            # Create message
+            # Create message with proper headers
             message = MIMEMultipart("alternative")
             message["From"] = settings.FROM_EMAIL
             message["To"] = recipient
             message["Subject"] = subject
+            message["Date"] = formatdate(localtime=True)
+            message["Message-ID"] = make_msgid(domain=settings.FROM_EMAIL.split('@')[1] if '@' in settings.FROM_EMAIL else 'eurobot.ru')
+            message["X-Mailer"] = "Eurobot Russia Mailer"
+            message["MIME-Version"] = "1.0"
             
             # Add plain text
             message.attach(MIMEText(body, "plain", "utf-8"))
             
-            # Add HTML if provided
-            if html:
-                message.attach(MIMEText(html, "html", "utf-8"))
+            # Add HTML - use provided or generate from template
+            html_content = html if html else create_html_template(body, subject)
+            message.attach(MIMEText(html_content, "html", "utf-8"))
             
             # Send email
             await aiosmtplib.send(

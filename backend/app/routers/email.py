@@ -144,19 +144,33 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new mass mailing campaign (super admin only)."""
-    # Get recipient count based on target
-    recipient_query = select(func.count(Team.id))
+    import json
     
-    if campaign_data.target_type == "approved_teams":
-        recipient_query = recipient_query.where(Team.status == TeamStatus.approved)
-    elif campaign_data.target_type == "pending_teams":
-        recipient_query = recipient_query.where(Team.status == TeamStatus.pending)
+    recipient_count = 0
+    custom_emails_json = None
     
-    if campaign_data.target_season_id:
-        recipient_query = recipient_query.where(Team.season_id == campaign_data.target_season_id)
-    
-    result = await db.execute(recipient_query)
-    recipient_count = result.scalar() or 0
+    if campaign_data.target_type == "custom_emails" and campaign_data.custom_emails:
+        # Custom email list
+        recipient_count = len(campaign_data.custom_emails)
+        custom_emails_json = json.dumps(campaign_data.custom_emails)
+    else:
+        # Get recipient count based on target
+        recipient_query = select(func.count(Team.id))
+        
+        if campaign_data.target_type == "approved_teams":
+            recipient_query = recipient_query.where(Team.status == TeamStatus.approved)
+        elif campaign_data.target_type == "pending_teams":
+            recipient_query = recipient_query.where(Team.status == TeamStatus.pending)
+        
+        if campaign_data.target_season_id:
+            recipient_query = recipient_query.where(Team.season_id == campaign_data.target_season_id)
+        
+        result = await db.execute(recipient_query)
+        recipient_count = result.scalar() or 0
+        
+        # Apply limit if specified
+        if campaign_data.recipients_limit and campaign_data.recipients_limit < recipient_count:
+            recipient_count = campaign_data.recipients_limit
     
     campaign = MassMailingCampaign(
         name=campaign_data.name,
@@ -164,6 +178,10 @@ async def create_campaign(
         body=campaign_data.body,
         target_type=campaign_data.target_type,
         target_season_id=campaign_data.target_season_id,
+        custom_emails=custom_emails_json,
+        recipients_limit=campaign_data.recipients_limit,
+        scheduled_at=campaign_data.scheduled_at,
+        is_scheduled=campaign_data.scheduled_at is not None,
         total_recipients=recipient_count,
         created_by=admin.id
     )
@@ -183,6 +201,8 @@ async def send_campaign(
     db: AsyncSession = Depends(get_db)
 ):
     """Send a mass mailing campaign (super admin only)."""
+    import json
+    
     result = await db.execute(
         select(MassMailingCampaign).where(MassMailingCampaign.id == campaign_id)
     )
@@ -194,33 +214,50 @@ async def send_campaign(
     if campaign.is_sent:
         raise HTTPException(status_code=400, detail="Рассылка уже отправлена")
     
-    # Get recipients
-    teams_query = select(Team)
+    # Get recipients based on target type
+    recipients = []
     
-    if campaign.target_type == "approved_teams":
-        teams_query = teams_query.where(Team.status == TeamStatus.approved)
-    elif campaign.target_type == "pending_teams":
-        teams_query = teams_query.where(Team.status == TeamStatus.pending)
+    if campaign.target_type == "custom_emails" and campaign.custom_emails:
+        # Custom email addresses
+        recipients = [(email, None) for email in json.loads(campaign.custom_emails)]
+    else:
+        # Get from teams
+        teams_query = select(Team)
+        
+        if campaign.target_type == "approved_teams":
+            teams_query = teams_query.where(Team.status == TeamStatus.approved)
+        elif campaign.target_type == "pending_teams":
+            teams_query = teams_query.where(Team.status == TeamStatus.pending)
+        
+        if campaign.target_season_id:
+            teams_query = teams_query.where(Team.season_id == campaign.target_season_id)
+        
+        # Order by registration date (newest first) for limit feature
+        teams_query = teams_query.order_by(Team.created_at.desc())
+        
+        # Apply limit if specified
+        if campaign.recipients_limit:
+            teams_query = teams_query.limit(campaign.recipients_limit)
+        
+        teams_result = await db.execute(teams_query)
+        teams = teams_result.scalars().all()
+        recipients = [(team.email, team.id) for team in teams]
     
-    if campaign.target_season_id:
-        teams_query = teams_query.where(Team.season_id == campaign.target_season_id)
-    
-    teams_result = await db.execute(teams_query)
-    teams = teams_result.scalars().all()
+    total_recipients = len(recipients)
     
     # Send emails in background
     async def send_campaign_emails():
         sent = 0
         failed = 0
         
-        for team in teams:
+        for email, team_id in recipients:
             success = await send_email(
-                to=team.email,
+                to=email,
                 subject=campaign.subject,
                 body=campaign.body,
                 db=db,
                 email_type="mass_mailing",
-                team_id=team.id,
+                team_id=team_id,
                 sent_by=admin.id
             )
             
@@ -238,7 +275,7 @@ async def send_campaign(
     
     background_tasks.add_task(send_campaign_emails)
     
-    return {"message": f"Рассылка запущена для {len(teams)} получателей"}
+    return {"message": f"Рассылка запущена для {total_recipients} получателей"}
 
 
 @router.delete("/campaigns/{campaign_id}")
@@ -263,6 +300,71 @@ async def delete_campaign(
     await db.commit()
     
     return {"message": "Рассылка удалена"}
+
+
+@router.get("/recipients/preview")
+async def preview_recipients(
+    target_type: str = Query(...),
+    season_id: Optional[int] = None,
+    limit: Optional[int] = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Preview recipients based on target criteria."""
+    teams_query = select(Team)
+    
+    if target_type == "approved_teams":
+        teams_query = teams_query.where(Team.status == TeamStatus.approved)
+    elif target_type == "pending_teams":
+        teams_query = teams_query.where(Team.status == TeamStatus.pending)
+    
+    if season_id:
+        teams_query = teams_query.where(Team.season_id == season_id)
+    
+    # Count total matching
+    count_query = select(func.count()).select_from(teams_query.subquery())
+    total_result = await db.execute(count_query)
+    total_count = total_result.scalar() or 0
+    
+    # Get sample with limit
+    teams_query = teams_query.order_by(Team.created_at.desc())
+    if limit:
+        teams_query = teams_query.limit(limit)
+    
+    teams_result = await db.execute(teams_query)
+    teams = teams_result.scalars().all()
+    
+    return {
+        "total_available": total_count,
+        "selected_count": len(teams),
+        "recipients": [{"email": team.email, "name": team.name} for team in teams]
+    }
+
+
+@router.get("/teams/emails")
+async def get_teams_emails(
+    season_id: Optional[int] = None,
+    status: Optional[str] = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all team emails for selection."""
+    teams_query = select(Team)
+    
+    if season_id:
+        teams_query = teams_query.where(Team.season_id == season_id)
+    
+    if status == "approved":
+        teams_query = teams_query.where(Team.status == TeamStatus.approved)
+    elif status == "pending":
+        teams_query = teams_query.where(Team.status == TeamStatus.pending)
+    
+    teams_query = teams_query.order_by(Team.created_at.desc())
+    
+    teams_result = await db.execute(teams_query)
+    teams = teams_result.scalars().all()
+    
+    return [{"id": team.id, "email": team.email, "name": team.name} for team in teams]
 
 
 @router.post("/send-custom")

@@ -53,8 +53,11 @@ class MassMailingCreate(BaseModel):
     name: str
     subject: str
     body: str
-    target_type: str  # 'all_teams', 'approved_teams', 'pending_teams'
+    target_type: str  # 'all_teams', 'approved_teams', 'pending_teams', 'custom_emails'
     target_season_id: Optional[int] = None
+    custom_emails: Optional[List[str]] = None  # List of custom email addresses
+    recipients_limit: Optional[int] = None  # Limit to last N registered teams
+    scheduled_at: Optional[datetime] = None  # When to send
 
 
 class MassMailingResponse(BaseModel):
@@ -65,6 +68,10 @@ class MassMailingResponse(BaseModel):
     body: str
     target_type: str
     target_season_id: Optional[int] = None
+    custom_emails: Optional[str] = None  # JSON string
+    recipients_limit: Optional[int] = None
+    scheduled_at: Optional[datetime] = None
+    is_scheduled: bool = False
     total_recipients: int
     sent_count: int
     failed_count: int

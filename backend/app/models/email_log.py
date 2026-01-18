@@ -68,8 +68,14 @@ class MassMailingCampaign(Base):
     body = Column(Text, nullable=False)
     
     # Targeting
-    target_type = Column(String(50), nullable=False)  # 'all_teams', 'approved_teams', 'pending_teams', etc.
+    target_type = Column(String(50), nullable=False)  # 'all_teams', 'approved_teams', 'pending_teams', 'custom_emails'
     target_season_id = Column(Integer, ForeignKey("seasons.id", ondelete="SET NULL"), nullable=True)
+    custom_emails = Column(Text, nullable=True)  # JSON list of custom email addresses
+    recipients_limit = Column(Integer, nullable=True)  # Limit number of recipients (last N registered)
+    
+    # Scheduling
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)  # When to send
+    is_scheduled = Column(Boolean, default=False)
     
     # Stats
     total_recipients = Column(Integer, default=0)

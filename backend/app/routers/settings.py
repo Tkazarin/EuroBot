@@ -54,6 +54,7 @@ async def get_setting(key: str, db: AsyncSession = Depends(get_db)):
 # Admin endpoints
 
 @router.get("/all/admin", response_model=List[SettingsResponse])
+@router.get("/all/admin/", response_model=List[SettingsResponse])
 async def get_all_settings(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)

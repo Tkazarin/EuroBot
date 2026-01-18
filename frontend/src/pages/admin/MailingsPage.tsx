@@ -10,9 +10,11 @@ import {
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  CalendarDaysIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
-import { emailsApi, MassMailingCampaign, EmailStats, EmailLog, CreateCampaignData } from '../../api/emails'
+import { emailsApi, MassMailingCampaign, EmailStats, EmailLog, CreateCampaignData, TeamEmail } from '../../api/emails'
 import { seasonsApi } from '../../api/seasons'
 import { Season } from '../../types'
 import { useAuthStore } from '../../store/authStore'
@@ -23,6 +25,7 @@ import Textarea from '../../components/ui/Textarea'
 import Select from '../../components/ui/Select'
 
 type TabType = 'campaigns' | 'logs' | 'custom'
+type RecipientMode = 'teams' | 'custom' | 'limit'
 
 const targetTypeOptions = [
   { value: 'all_teams', label: 'Все команды' },
@@ -66,18 +69,53 @@ export default function MailingsPage() {
   // Seasons for campaign creation
   const [seasons, setSeasons] = useState<Season[]>([])
   
+  // Teams emails for selection
+  const [teamsEmails, setTeamsEmails] = useState<TeamEmail[]>([])
+  const [loadingEmails, setLoadingEmails] = useState(false)
+  
+  // Recipient mode: teams (from target), custom (manual input), limit (last N)
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>('teams')
+  
   // Campaign form
   const [campaignForm, setCampaignForm] = useState<CreateCampaignData>({
     name: '',
     subject: '',
     body: '',
     target_type: 'approved_teams',
-    target_season_id: undefined
+    target_season_id: undefined,
+    custom_emails: undefined,
+    recipients_limit: undefined,
+    scheduled_at: undefined
   })
+  
+  // Custom emails input - array of individual emails
+  const [customEmailsList, setCustomEmailsList] = useState<string[]>([''])
+  
+  // Scheduling
+  const [enableSchedule, setEnableSchedule] = useState(false)
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleTime, setScheduleTime] = useState('')
+  
+  // Recipients limit
+  const [recipientsLimit, setRecipientsLimit] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     loadData()
   }, [activeTab, logsPage])
+  
+  // Load teams emails when modal opens
+  const loadTeamsEmails = async () => {
+    setLoadingEmails(true)
+    try {
+      const emails = await emailsApi.getTeamsEmails()
+      setTeamsEmails(emails)
+    } catch (e) {
+      console.error('Failed to load teams emails:', e)
+      setTeamsEmails([])
+    } finally {
+      setLoadingEmails(false)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -131,24 +169,103 @@ export default function MailingsPage() {
       return
     }
 
+    // Build campaign data based on recipient mode
+    let finalData: CreateCampaignData = {
+      ...campaignForm,
+      target_type: recipientMode === 'custom' ? 'custom_emails' : campaignForm.target_type
+    }
+    
+    // Handle custom emails
+    if (recipientMode === 'custom') {
+      const emails = customEmailsList.filter(e => e.trim() && e.includes('@'))
+      if (emails.length === 0) {
+        toast.error('Укажите хотя бы один email')
+        return
+      }
+      finalData.custom_emails = emails
+    }
+    
+    // Handle limit
+    if (recipientMode === 'limit' && recipientsLimit && recipientsLimit > 0) {
+      finalData.recipients_limit = recipientsLimit
+    }
+    
+    // Handle scheduling
+    if (enableSchedule && scheduleDate && scheduleTime) {
+      finalData.scheduled_at = `${scheduleDate}T${scheduleTime}:00`
+    }
+
     setCreating(true)
     try {
-      await emailsApi.createCampaign(campaignForm)
+      await emailsApi.createCampaign(finalData)
       toast.success('Рассылка создана')
       setShowCreateModal(false)
-      setCampaignForm({
-        name: '',
-        subject: '',
-        body: '',
-        target_type: 'approved_teams',
-        target_season_id: undefined
-      })
+      resetForm()
       loadData()
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Ошибка при создании')
     } finally {
       setCreating(false)
     }
+  }
+  
+  const resetForm = () => {
+    setCampaignForm({
+      name: '',
+      subject: '',
+      body: '',
+      target_type: 'approved_teams',
+      target_season_id: undefined,
+      custom_emails: undefined,
+      recipients_limit: undefined,
+      scheduled_at: undefined
+    })
+    setRecipientMode('teams')
+    setCustomEmailsList([''])
+    setEnableSchedule(false)
+    setScheduleDate('')
+    setScheduleTime('')
+    setRecipientsLimit(undefined)
+  }
+  
+  // Custom email field handlers
+  const addEmailField = () => {
+    setCustomEmailsList([...customEmailsList, ''])
+  }
+  
+  const removeEmailField = (index: number) => {
+    if (customEmailsList.length > 1) {
+      setCustomEmailsList(customEmailsList.filter((_, i) => i !== index))
+    }
+  }
+  
+  const updateEmailField = (index: number, value: string) => {
+    const updated = [...customEmailsList]
+    updated[index] = value
+    setCustomEmailsList(updated)
+  }
+  
+  const addEmailFromTeam = (email: string) => {
+    if (!customEmailsList.includes(email)) {
+      // Replace empty field or add new
+      const emptyIndex = customEmailsList.findIndex(e => !e.trim())
+      if (emptyIndex !== -1) {
+        updateEmailField(emptyIndex, email)
+      } else {
+        setCustomEmailsList([...customEmailsList, email])
+      }
+    }
+  }
+  
+  const removeEmailFromList = (email: string) => {
+    const filtered = customEmailsList.filter(e => e !== email)
+    setCustomEmailsList(filtered.length > 0 ? filtered : [''])
+  }
+  
+  const openCreateModal = () => {
+    resetForm()
+    loadTeamsEmails()
+    setShowCreateModal(true)
   }
 
   const handleSendCampaign = async (campaign: MassMailingCampaign) => {
@@ -228,7 +345,7 @@ export default function MailingsPage() {
         </h1>
         {isSuperAdmin && activeTab === 'campaigns' && (
           <Button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModal}
             leftIcon={<PlusIcon className="w-5 h-5" />}
           >
             Создать рассылку
@@ -290,7 +407,7 @@ export default function MailingsPage() {
                   <p>Нет созданных рассылок</p>
                   {isSuperAdmin && (
                     <Button
-                      onClick={() => setShowCreateModal(true)}
+                      onClick={openCreateModal}
                       variant="outline"
                       className="mt-4"
                     >
@@ -314,6 +431,11 @@ export default function MailingsPage() {
                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
                               <CheckCircleIcon className="w-3 h-3 inline mr-1" />
                               Отправлено
+                            </span>
+                          ) : campaign.is_scheduled && campaign.scheduled_at ? (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                              <CalendarDaysIcon className="w-3 h-3 inline mr-1" />
+                              Запланировано на {formatDate(campaign.scheduled_at)}
                             </span>
                           ) : (
                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
@@ -412,23 +534,23 @@ export default function MailingsPage() {
               )}
 
               {/* Logs table */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-56">
                         Получатель
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Тема
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">
                         Тип
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Статус
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[300px]">
+                        Статус / Ошибка
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">
                         Дата
                       </th>
                     </tr>
@@ -436,33 +558,33 @@ export default function MailingsPage() {
                   <tbody className="divide-y divide-gray-200">
                     {logs.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
                           Нет записей
                         </td>
                       </tr>
                     ) : (
                       logs.map((log) => (
                         <tr key={log.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-4 py-4 text-sm text-gray-900 break-all">
                             {log.to_email}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                          <td className="px-4 py-4 text-sm text-gray-500">
                             {log.subject}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {log.email_type}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-4">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusLabels[log.status]?.color || 'bg-gray-100'}`}>
                               {statusLabels[log.status]?.label || log.status}
                             </span>
                             {log.error_message && (
-                              <div className="mt-1 text-xs text-red-500 truncate max-w-xs" title={log.error_message}>
+                              <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded break-words">
                                 {log.error_message}
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(log.created_at)}
                           </td>
                         </tr>
@@ -543,14 +665,14 @@ export default function MailingsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
           >
             <div className="p-6 border-b">
               <h2 className="text-xl font-heading font-bold">
                 Создать рассылку
               </h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-6">
               <Input
                 label="Название рассылки"
                 value={campaignForm.name}
@@ -558,24 +680,222 @@ export default function MailingsPage() {
                 placeholder="Например: Напоминание о регистрации"
                 required
               />
-              <Select
-                label="Целевая аудитория"
-                value={campaignForm.target_type}
-                onChange={(e) => setCampaignForm({ ...campaignForm, target_type: e.target.value as CreateCampaignData['target_type'] })}
-                options={targetTypeOptions}
-              />
-              <Select
-                label="Сезон (необязательно)"
-                value={campaignForm.target_season_id?.toString() || ''}
-                onChange={(e) => setCampaignForm({ 
-                  ...campaignForm, 
-                  target_season_id: e.target.value ? parseInt(e.target.value) : undefined 
-                })}
-                options={[
-                  { value: '', label: 'Все сезоны' },
-                  ...seasons.map(s => ({ value: s.id.toString(), label: s.name }))
-                ]}
-              />
+              
+              {/* Recipient Mode Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Способ выбора получателей
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('teams')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      recipientMode === 'teams'
+                        ? 'border-eurobot-blue bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <UserGroupIcon className="w-6 h-6 mb-2 text-eurobot-blue" />
+                    <div className="font-medium">По категории</div>
+                    <div className="text-xs text-gray-500">Выбрать по статусу команды</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('limit')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      recipientMode === 'limit'
+                        ? 'border-eurobot-blue bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <ChartBarIcon className="w-6 h-6 mb-2 text-eurobot-blue" />
+                    <div className="font-medium">Последние N</div>
+                    <div className="text-xs text-gray-500">Ограничить количество</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('custom')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      recipientMode === 'custom'
+                        ? 'border-eurobot-blue bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <EnvelopeIcon className="w-6 h-6 mb-2 text-eurobot-blue" />
+                    <div className="font-medium">Свои email</div>
+                    <div className="text-xs text-gray-500">Ввести адреса вручную</div>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Teams selection mode */}
+              {recipientMode === 'teams' && (
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                  <Select
+                    label="Целевая аудитория"
+                    value={campaignForm.target_type}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, target_type: e.target.value as CreateCampaignData['target_type'] })}
+                    options={targetTypeOptions}
+                  />
+                  <Select
+                    label="Сезон (необязательно)"
+                    value={campaignForm.target_season_id?.toString() || ''}
+                    onChange={(e) => setCampaignForm({ 
+                      ...campaignForm, 
+                      target_season_id: e.target.value ? parseInt(e.target.value) : undefined 
+                    })}
+                    options={[
+                      { value: '', label: 'Все сезоны' },
+                      ...seasons.map(s => ({ value: s.id.toString(), label: s.name }))
+                    ]}
+                  />
+                </div>
+              )}
+              
+              {/* Limit mode */}
+              {recipientMode === 'limit' && (
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                  <Select
+                    label="Целевая аудитория"
+                    value={campaignForm.target_type}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, target_type: e.target.value as CreateCampaignData['target_type'] })}
+                    options={targetTypeOptions}
+                  />
+                  <Input
+                    type="number"
+                    label="Количество последних зарегистрированных"
+                    value={recipientsLimit?.toString() || ''}
+                    onChange={(e) => setRecipientsLimit(e.target.value ? parseInt(e.target.value) : undefined)}
+                    placeholder="Например: 50"
+                    min={1}
+                  />
+                  <p className="text-sm text-gray-500">
+                    Письмо получат последние N зарегистрированных команд из выбранной категории
+                  </p>
+                </div>
+              )}
+              
+              {/* Custom emails mode */}
+              {recipientMode === 'custom' && (
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email адреса ({customEmailsList.filter(e => e.trim()).length})
+                    </label>
+                    <div className="space-y-2">
+                      {customEmailsList.map((email, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            type="email"
+                            value={email}
+                            onChange={(e) => updateEmailField(index, e.target.value)}
+                            placeholder="example@email.com"
+                            className="flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeEmailField(index)}
+                            disabled={customEmailsList.length === 1 && !email}
+                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addEmailField}
+                      className="mt-2 flex items-center gap-1 text-sm text-eurobot-blue hover:text-blue-700"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      Добавить ещё email
+                    </button>
+                  </div>
+                  
+                  {/* Quick select from registered teams */}
+                  {teamsEmails.length > 0 && (
+                    <div className="mt-4 border-t pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Быстрый выбор из зарегистрированных ({teamsEmails.length}):
+                      </label>
+                      <div className="max-h-48 overflow-y-auto border rounded-lg bg-white">
+                        {loadingEmails ? (
+                          <div className="text-center py-4 text-gray-500">Загрузка...</div>
+                        ) : (
+                          teamsEmails.map((team) => {
+                            const isSelected = customEmailsList.includes(team.email)
+                            return (
+                              <div
+                                key={team.id}
+                                className={`flex items-center justify-between p-3 border-b last:border-b-0 ${
+                                  isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm truncate">{team.name}</div>
+                                  <div className="text-xs text-gray-500 truncate">{team.email}</div>
+                                </div>
+                                {isSelected ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeEmailFromList(team.email)}
+                                    className="ml-2 px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full hover:bg-red-200"
+                                  >
+                                    Убрать
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => addEmailFromTeam(team.email)}
+                                    className="ml-2 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                                  >
+                                    Добавить
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Scheduling */}
+              <div className="border-t pt-6">
+                <label className="flex items-center cursor-pointer mb-4">
+                  <input
+                    type="checkbox"
+                    checked={enableSchedule}
+                    onChange={(e) => setEnableSchedule(e.target.checked)}
+                    className="rounded border-gray-300 text-eurobot-blue mr-3"
+                  />
+                  <CalendarDaysIcon className="w-5 h-5 mr-2 text-gray-500" />
+                  <span className="font-medium">Запланировать отправку</span>
+                </label>
+                
+                {enableSchedule && (
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                    <Input
+                      type="date"
+                      label="Дата отправки"
+                      value={scheduleDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    <Input
+                      type="time"
+                      label="Время отправки"
+                      value={scheduleTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+              
               <Input
                 label="Тема письма"
                 value={campaignForm.subject}
@@ -591,12 +911,18 @@ export default function MailingsPage() {
                 rows={8}
                 required
               />
+              
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-start">
                   <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mt-0.5 mr-2" />
                   <div className="text-sm text-yellow-800">
                     <p className="font-medium">Важно!</p>
-                    <p>После создания рассылку нужно будет вручную отправить. Количество получателей будет рассчитано автоматически.</p>
+                    <p>
+                      {enableSchedule 
+                        ? 'Рассылка будет отправлена автоматически в указанное время.' 
+                        : 'После создания рассылку нужно будет вручную отправить.'
+                      }
+                    </p>
                   </div>
                 </div>
               </div>
@@ -612,7 +938,7 @@ export default function MailingsPage() {
                 onClick={handleCreateCampaign}
                 isLoading={creating}
               >
-                Создать
+                {enableSchedule ? 'Запланировать' : 'Создать'}
               </Button>
             </div>
           </motion.div>

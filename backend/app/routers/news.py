@@ -21,6 +21,7 @@ router = APIRouter(prefix="/news", tags=["News"])
 
 # Public endpoints
 
+@router.get("", response_model=NewsListResponse)
 @router.get("/", response_model=NewsListResponse)
 async def list_news(
     page: int = Query(1, ge=1),

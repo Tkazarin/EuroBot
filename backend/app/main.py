@@ -26,12 +26,41 @@ from app.routers import (
 )
 
 
+async def run_migrations():
+    """Run database migrations for new columns."""
+    from sqlalchemy import text
+    from app.database import async_session_maker
+    
+    async with async_session_maker() as session:
+        try:
+            # Add missing columns to mass_mailing_campaigns
+            migrations = [
+                "ALTER TABLE mass_mailing_campaigns ADD COLUMN IF NOT EXISTS custom_emails TEXT",
+                "ALTER TABLE mass_mailing_campaigns ADD COLUMN IF NOT EXISTS recipients_limit INTEGER",
+                "ALTER TABLE mass_mailing_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE",
+                "ALTER TABLE mass_mailing_campaigns ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE",
+            ]
+            
+            for migration in migrations:
+                try:
+                    await session.execute(text(migration))
+                except Exception as e:
+                    logger.debug(f"Migration skipped: {e}")
+            
+            await session.commit()
+            logger.info("Database migrations completed")
+        except Exception as e:
+            logger.error(f"Migration error: {e}")
+            await session.rollback()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     logger.info("Starting Eurobot API...")
     await init_db()
+    await run_migrations()
     await create_initial_data()
     logger.info("Database initialized")
     

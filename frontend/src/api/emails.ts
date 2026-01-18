@@ -35,6 +35,10 @@ export interface MassMailingCampaign {
   body: string
   target_type: string
   target_season_id?: number
+  custom_emails?: string
+  recipients_limit?: number
+  scheduled_at?: string
+  is_scheduled: boolean
   total_recipients: number
   sent_count: number
   failed_count: number
@@ -54,8 +58,23 @@ export interface CreateCampaignData {
   name: string
   subject: string
   body: string
-  target_type: 'all_teams' | 'approved_teams' | 'pending_teams'
+  target_type: 'all_teams' | 'approved_teams' | 'pending_teams' | 'custom_emails'
   target_season_id?: number
+  custom_emails?: string[]
+  recipients_limit?: number
+  scheduled_at?: string
+}
+
+export interface TeamEmail {
+  id: number
+  email: string
+  name: string
+}
+
+export interface RecipientsPreview {
+  total_available: number
+  selected_count: number
+  recipients: { email: string; name: string }[]
 }
 
 export interface SendCustomEmailData {
@@ -110,6 +129,25 @@ export const emailsApi = {
   // Custom email
   sendCustom: async (data: SendCustomEmailData): Promise<{ message: string }> => {
     const response = await apiClient.post('/emails/send-custom', data)
+    return response.data
+  },
+
+  // Get team emails for selection
+  getTeamsEmails: async (params?: {
+    season_id?: number
+    status?: string
+  }): Promise<TeamEmail[]> => {
+    const response = await apiClient.get('/emails/teams/emails', { params })
+    return response.data
+  },
+
+  // Preview recipients
+  previewRecipients: async (params: {
+    target_type: string
+    season_id?: number
+    limit?: number
+  }): Promise<RecipientsPreview> => {
+    const response = await apiClient.get('/emails/recipients/preview', { params })
     return response.data
   }
 }
