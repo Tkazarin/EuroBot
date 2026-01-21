@@ -57,6 +57,8 @@ export default function MailingsPage() {
   const [logsPage, setLogsPage] = useState(1)
   const [logsPages, setLogsPages] = useState(1)
   const [stats, setStats] = useState<EmailStats | null>(null)
+  const [clearingLogs, setClearingLogs] = useState(false)
+  const [clearingCampaigns, setClearingCampaigns] = useState(false)
   
   // Custom email state
   const [customEmail, setCustomEmail] = useState({
@@ -337,6 +339,40 @@ export default function MailingsPage() {
     })
   }
 
+  const handleClearLogs = async () => {
+    if (!confirm('Вы уверены, что хотите очистить всю историю отправок? Это действие нельзя отменить.')) {
+      return
+    }
+
+    setClearingLogs(true)
+    try {
+      const result = await emailsApi.clearLogs()
+      toast.success(result.message)
+      loadData()
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Ошибка при очистке истории')
+    } finally {
+      setClearingLogs(false)
+    }
+  }
+
+  const handleClearCampaigns = async () => {
+    if (!confirm('Вы уверены, что хотите удалить все рассылки? Это действие нельзя отменить.')) {
+      return
+    }
+
+    setClearingCampaigns(true)
+    try {
+      const result = await emailsApi.clearCampaigns()
+      toast.success(result.message)
+      loadData()
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Ошибка при удалении рассылок')
+    } finally {
+      setClearingCampaigns(false)
+    }
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -344,12 +380,25 @@ export default function MailingsPage() {
           Рассылки
         </h1>
         {isSuperAdmin && activeTab === 'campaigns' && (
-          <Button
-            onClick={openCreateModal}
-            leftIcon={<PlusIcon className="w-5 h-5" />}
-          >
-            Создать рассылку
-          </Button>
+          <div className="flex gap-2">
+            {campaigns.length > 0 && (
+              <Button
+                variant="outline"
+                color="red"
+                onClick={handleClearCampaigns}
+                isLoading={clearingCampaigns}
+                leftIcon={<TrashIcon className="w-5 h-5" />}
+              >
+                Очистить все
+              </Button>
+            )}
+            <Button
+              onClick={openCreateModal}
+              leftIcon={<PlusIcon className="w-5 h-5" />}
+            >
+              Создать рассылку
+            </Button>
+          </div>
         )}
       </div>
 
@@ -511,6 +560,22 @@ export default function MailingsPage() {
           {/* Logs Tab */}
           {activeTab === 'logs' && (
             <div>
+              {/* Header with clear button */}
+              {isSuperAdmin && logs.length > 0 && (
+                <div className="flex justify-end mb-4">
+                  <Button
+                    variant="outline"
+                    color="red"
+                    size="sm"
+                    onClick={handleClearLogs}
+                    isLoading={clearingLogs}
+                    leftIcon={<TrashIcon className="w-4 h-4" />}
+                  >
+                    Очистить историю
+                  </Button>
+                </div>
+              )}
+
               {/* Stats */}
               {stats && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

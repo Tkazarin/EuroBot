@@ -20,6 +20,30 @@ from app.utils.email import send_email
 router = APIRouter(prefix="/emails", tags=["Email"])
 
 
+@router.delete("/logs")
+async def clear_email_logs(
+    admin: User = Depends(get_current_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Clear all email logs (super admin only)."""
+    from sqlalchemy import delete
+    await db.execute(delete(EmailLog))
+    await db.commit()
+    return {"message": "История отправок очищена"}
+
+
+@router.delete("/campaigns")
+async def clear_all_campaigns(
+    admin: User = Depends(get_current_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Clear all mass mailing campaigns (super admin only)."""
+    from sqlalchemy import delete
+    await db.execute(delete(MassMailingCampaign))
+    await db.commit()
+    return {"message": "Все рассылки удалены"}
+
+
 @router.get("/logs", response_model=EmailLogListResponse)
 async def list_email_logs(
     page: int = Query(1, ge=1),

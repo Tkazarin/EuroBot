@@ -149,6 +149,18 @@ export const emailsApi = {
   }): Promise<RecipientsPreview> => {
     const response = await apiClient.get('/emails/recipients/preview', { params })
     return response.data
+  },
+
+  // Clear all email logs
+  clearLogs: async (): Promise<{ message: string }> => {
+    const response = await apiClient.delete('/emails/logs')
+    return response.data
+  },
+
+  // Clear all campaigns
+  clearCampaigns: async (): Promise<{ message: string }> => {
+    const response = await apiClient.delete('/emails/campaigns')
+    return response.data
   }
 }
 
