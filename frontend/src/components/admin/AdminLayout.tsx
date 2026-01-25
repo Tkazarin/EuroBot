@@ -16,7 +16,8 @@ import {
   UsersIcon,
   CircleStackIcon,
   PaperAirplaneIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '../../store/authStore'
 
@@ -33,6 +34,7 @@ const navigation: NavItem[] = [
   { name: 'Команды', href: '/admin/teams', icon: UserGroupIcon },
   { name: 'Партнеры', href: '/admin/partners', icon: BuildingOfficeIcon },
   { name: 'Сезоны', href: '/admin/seasons', icon: CalendarIcon },
+  { name: 'Архив', href: '/admin/archive', icon: ArchiveBoxIcon },
   { name: 'Поля регистрации', href: '/admin/registration-fields', icon: ClipboardDocumentListIcon },
   { name: 'Сообщения', href: '/admin/messages', icon: EnvelopeIcon },
   { name: 'Рассылки', href: '/admin/mailings', icon: PaperAirplaneIcon },

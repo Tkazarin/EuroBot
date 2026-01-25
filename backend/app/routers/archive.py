@@ -69,7 +69,14 @@ async def create_archive_season(
     season = ArchiveSeason(**season_data.model_dump())
     db.add(season)
     await db.commit()
-    await db.refresh(season)
+    
+    # Re-fetch with relationships loaded
+    result = await db.execute(
+        select(ArchiveSeason).options(
+            selectinload(ArchiveSeason.media)
+        ).where(ArchiveSeason.id == season.id)
+    )
+    season = result.scalar_one()
     
     return season
 
@@ -100,7 +107,14 @@ async def update_archive_season(
         setattr(season, field, value)
     
     await db.commit()
-    await db.refresh(season)
+    
+    # Re-fetch with relationships loaded
+    result = await db.execute(
+        select(ArchiveSeason).options(
+            selectinload(ArchiveSeason.media)
+        ).where(ArchiveSeason.id == season_id)
+    )
+    season = result.scalar_one()
     
     return season
 

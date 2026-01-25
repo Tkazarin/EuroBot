@@ -23,6 +23,7 @@ const AdminNews = lazy(() => import('./pages/admin/NewsManagement'))
 const AdminTeams = lazy(() => import('./pages/admin/TeamsManagement'))
 const AdminPartners = lazy(() => import('./pages/admin/PartnersManagement'))
 const AdminSeasons = lazy(() => import('./pages/admin/SeasonsManagement'))
+const AdminArchive = lazy(() => import('./pages/admin/ArchiveManagement'))
 const AdminMessages = lazy(() => import('./pages/admin/MessagesManagement'))
 const AdminSettings = lazy(() => import('./pages/admin/SettingsManagement'))
 const AdminAdmins = lazy(() => import('./pages/admin/AdminsManagement'))
@@ -59,6 +60,7 @@ function App() {
           <Route path="teams" element={<AdminTeams />} />
           <Route path="partners" element={<AdminPartners />} />
           <Route path="seasons" element={<AdminSeasons />} />
+          <Route path="archive" element={<AdminArchive />} />
           <Route path="messages" element={<AdminMessages />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="admins" element={<AdminAdmins />} />

@@ -24,7 +24,7 @@ export interface ArchiveMediaCreateData {
 
 export const archiveApi = {
   getSeasons: async (): Promise<ArchiveSeason[]> => {
-    const response = await apiClient.get('/archive')
+    const response = await apiClient.get('/archive/')
     return response.data
   },
 

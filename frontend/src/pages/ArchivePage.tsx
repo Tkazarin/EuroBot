@@ -97,11 +97,14 @@ export default function ArchivePage() {
                     {/* Season header */}
                     <div className="mb-8">
                       {selectedSeason.cover_image && (
-                        <div className="aspect-video rounded-xl overflow-hidden mb-6">
+                        <div className="aspect-video rounded-xl overflow-hidden mb-6 bg-gray-100">
                           <img
                             src={selectedSeason.cover_image}
                             alt={selectedSeason.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
                           />
                         </div>
                       )}
